@@ -29063,6 +29063,7 @@ __nccwpck_require__.a(module, async (__webpack_handle_async_dependencies__, __we
 
 
 
+const DEFAULT_FILE_GLOB = ["**/*.toc", "**/*.toc.js", "**/*.ps1"].join("\n");
 function createCachedResolver() {
     const cache = new Map();
     return async (target) => {
@@ -29073,7 +29074,7 @@ function createCachedResolver() {
     };
 }
 async function run() {
-    const tocGlob = _actions_core__WEBPACK_IMPORTED_MODULE_0__/* .getInput */ .V4("toc-glob") || "**/*.toc";
+    const tocGlob = _actions_core__WEBPACK_IMPORTED_MODULE_0__/* .getInput */ .V4("toc-glob") || DEFAULT_FILE_GLOB;
     const marker = _actions_core__WEBPACK_IMPORTED_MODULE_0__/* .getInput */ .V4("marker") || "WOW_INTERFACE_TARGETS";
     const globber = await _actions_glob__WEBPACK_IMPORTED_MODULE_1__/* .create */ .v(tocGlob, {
         followSymbolicLinks: false
@@ -29191,7 +29192,7 @@ function inlineCode(value) {
 async function updateTocText(text, marker, resolveTarget) {
     const newline = detectNewline(text);
     const { lines, finalNewline } = splitLines(text);
-    const markerPrefix = "(?:#|//)";
+    const markerPrefix = "\\s*(?:#|//)";
     const markerRegex = new RegExp(`^${markerPrefix}\\s*${escapeRegExp(marker)}\\s*:\\s*(.*)$`);
     const malformedMarkerRegex = new RegExp(`^${markerPrefix}\\s*${escapeRegExp(marker)}\\b`);
     const changes = [];

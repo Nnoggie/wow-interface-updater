@@ -104,6 +104,30 @@ describe("updateTocText", () => {
     );
   });
 
+  it("updates PowerShell TOC content arrays with hash markers", async () => {
+    const input = [
+      "$tocContent = @(",
+      "  # WOW_INTERFACE_TARGETS: mainline-test, mainline, mists, vanilla",
+      '  "## Interface: 1"',
+      '  "## Title: SharedMedia_Template"',
+      ")",
+      ""
+    ].join("\n");
+
+    const result = await updateTocText(input, "WOW_INTERFACE_TARGETS", resolveTarget);
+
+    expect(result.text).toBe(
+      [
+        "$tocContent = @(",
+        "  # WOW_INTERFACE_TARGETS: mainline-test, mainline, mists, vanilla",
+        '  "## Interface: 120005, 120001, 50503, 11508"',
+        '  "## Title: SharedMedia_Template"',
+        ")",
+        ""
+      ].join("\n")
+    );
+  });
+
   it("fails when a marker is not followed by an interface line", async () => {
     await expect(
       updateTocText(

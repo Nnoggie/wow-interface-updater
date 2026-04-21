@@ -22,6 +22,16 @@ export default `## Interface: 120005, 120001
 `;
 ```
 
+For embedded TOC strings in PowerShell files, use a `#` marker immediately above the interface string:
+
+```powershell
+$tocContent = @(
+  # WOW_INTERFACE_TARGETS: mainline-test, mainline, mists, vanilla
+  "## Interface: 120005, 120001, 50503, 11508"
+  "## Title: SharedMedia_Template"
+)
+```
+
 ## Workflow
 
 ```yaml
@@ -59,7 +69,7 @@ jobs:
 
 | Name | Default | Description |
 | --- | --- | --- |
-| `toc-glob` | `**/*.toc` | Glob pattern for TOC files to scan. Use `**/*.toc.js` for embedded JS TOC strings. |
+| `toc-glob` | `**/*.toc`, `**/*.toc.js`, `**/*.ps1` | Glob pattern for files to scan. |
 | `marker` | `WOW_INTERFACE_TARGETS` | Comment marker that declares Warcraft Wiki targets. |
 
 ## Outputs

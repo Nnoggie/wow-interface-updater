@@ -8,6 +8,8 @@ import {
 } from "./updater.js";
 import { resolveLatestInterface } from "./wiki.js";
 
+const DEFAULT_FILE_GLOB = ["**/*.toc", "**/*.toc.js", "**/*.ps1"].join("\n");
+
 function createCachedResolver(): ResolveTarget {
   const cache = new Map<string, Promise<string>>();
 
@@ -21,7 +23,7 @@ function createCachedResolver(): ResolveTarget {
 }
 
 async function run(): Promise<void> {
-  const tocGlob = core.getInput("toc-glob") || "**/*.toc";
+  const tocGlob = core.getInput("toc-glob") || DEFAULT_FILE_GLOB;
   const marker = core.getInput("marker") || "WOW_INTERFACE_TARGETS";
   const globber = await glob.create(tocGlob, {
     followSymbolicLinks: false

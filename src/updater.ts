@@ -100,7 +100,7 @@ export async function updateTocText(
 ): Promise<TocTextUpdate> {
   const newline = detectNewline(text);
   const { lines, finalNewline } = splitLines(text);
-  const markerPrefix = "(?:#|//)";
+  const markerPrefix = "\\s*(?:#|//)";
   const markerRegex = new RegExp(`^${markerPrefix}\\s*${escapeRegExp(marker)}\\s*:\\s*(.*)$`);
   const malformedMarkerRegex = new RegExp(`^${markerPrefix}\\s*${escapeRegExp(marker)}\\b`);
   const changes: Omit<TocChange, "filePath">[] = [];

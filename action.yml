@@ -4,9 +4,12 @@ author: Nnoggie
 
 inputs:
   toc-glob:
-    description: Glob pattern for TOC files to scan.
+    description: Glob pattern for files to scan.
     required: false
-    default: "**/*.toc"
+    default: |
+      **/*.toc
+      **/*.toc.js
+      **/*.ps1
   marker:
     description: Comment marker that declares Warcraft Wiki API_LatestInterface targets.
     required: false
