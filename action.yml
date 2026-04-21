@@ -1,0 +1,25 @@
+name: WoW TOC Interface Updater
+description: Update WoW add-on TOC Interface values from Warcraft Wiki targets.
+author: Nnoggie
+
+inputs:
+  toc-glob:
+    description: Glob pattern for TOC files to scan.
+    required: false
+    default: "**/*.toc"
+  marker:
+    description: Comment marker that declares Warcraft Wiki API_LatestInterface targets.
+    required: false
+    default: WOW_INTERFACE_TARGETS
+
+outputs:
+  changed:
+    description: Whether any TOC file changed.
+  updated-files:
+    description: Comma-separated list of updated TOC files.
+  pr-body:
+    description: Markdown summary suitable for create-pull-request body.
+
+runs:
+  using: node24
+  main: dist/index.js

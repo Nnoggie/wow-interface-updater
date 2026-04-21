@@ -1,0 +1,33 @@
+{
+  "name": "wow-interface-updater",
+  "version": "0.1.0",
+  "private": true,
+  "description": "GitHub Action that updates WoW TOC Interface values from Warcraft Wiki targets.",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc --noEmit && ncc build src/main.ts -o dist --source-map",
+    "test": "vitest run",
+    "check": "npm run test && npm run build"
+  },
+  "keywords": [
+    "github-action",
+    "world-of-warcraft",
+    "toc",
+    "interface"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@actions/core": "^3.0.0",
+    "@actions/glob": "^0.6.1"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.1",
+    "@vercel/ncc": "^0.38.4",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.14"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}

@@ -1,0 +1,66 @@
+# WoW TOC Interface Updater
+
+Reusable GitHub Action for keeping World of Warcraft add-on TOC `## Interface:` values in sync with Warcraft Wiki's `Template:API_LatestInterface`.
+
+## TOC marker
+
+Add a marker comment immediately above each generated interface line:
+
+```toc
+# WOW_INTERFACE_TARGETS: mainline-beta, mainline-test, mainline, mists
+## Interface: 120005, 120001, 50503
+```
+
+The action resolves every target, removes duplicate interface numbers, and sorts the final values numerically descending.
+
+## Workflow
+
+```yaml
+name: Update WoW TOC Interface
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "37 4 * * 1"
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - id: toc
+        uses: <owner>/wow-interface-updater@v1
+
+      - uses: peter-evans/create-pull-request@v7
+        if: steps.toc.outputs.changed == 'true'
+        with:
+          branch: automation/wow-interface
+          delete-branch: true
+          commit-message: Update WoW TOC interface versions
+          title: Update WoW TOC interface versions
+          body: ${{ steps.toc.outputs.pr-body }}
+```
+
+## Inputs
+
+| Name | Default | Description |
+| --- | --- | --- |
+| `toc-glob` | `**/*.toc` | Glob pattern for TOC files to scan. |
+| `marker` | `WOW_INTERFACE_TARGETS` | Comment marker that declares Warcraft Wiki targets. |
+
+## Outputs
+
+| Name | Description |
+| --- | --- |
+| `changed` | `true` when at least one `## Interface:` line changed. |
+| `updated-files` | Comma-separated list of changed TOC files. |
+| `pr-body` | Markdown summary suitable for `peter-evans/create-pull-request`. |
+
+## Failure behavior
+
+The action fails without writing a partial update when a marker is malformed, a marker is not immediately followed by `## Interface:`, Warcraft Wiki cannot be reached, or a target resolves to a non-numeric value.
