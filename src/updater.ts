@@ -89,6 +89,10 @@ function toReportPath(filePath: string): string {
   return reportPath.split(path.sep).join("/");
 }
 
+function inlineCode(value: string): string {
+  return value.includes("`") ? `\`\` ${value} \`\`` : `\`${value}\``;
+}
+
 export async function updateTocText(
   text: string,
   marker: string,
@@ -214,10 +218,10 @@ export function buildPullRequestBody(changes: TocChange[]): string {
   ];
 
   for (const change of changes) {
-    lines.push(`- \`${change.filePath}\` line ${change.lineNumber}`);
-    lines.push(`  - Targets: \`${change.targets.join(", ")}\``);
-    lines.push(`  - Old: \`${change.oldInterface}\``);
-    lines.push(`  - New: \`${change.newInterface}\``);
+    lines.push(`- ${inlineCode(change.filePath)} line ${change.lineNumber}`);
+    lines.push(`  - Targets: ${inlineCode(change.targets.join(", "))}`);
+    lines.push(`  - Old: ${inlineCode(change.oldInterface)}`);
+    lines.push(`  - New: ${inlineCode(change.newInterface)}`);
   }
 
   return lines.join("\n");

@@ -29185,6 +29185,9 @@ function toReportPath(filePath) {
         : filePath;
     return reportPath.split((external_node_path_default()).sep).join("/");
 }
+function inlineCode(value) {
+    return value.includes("`") ? `\`\` ${value} \`\`` : `\`${value}\``;
+}
 async function updateTocText(text, marker, resolveTarget) {
     const newline = detectNewline(text);
     const { lines, finalNewline } = splitLines(text);
@@ -29271,10 +29274,10 @@ function buildPullRequestBody(changes) {
         ""
     ];
     for (const change of changes) {
-        lines.push(`- \`${change.filePath}\` line ${change.lineNumber}`);
-        lines.push(`  - Targets: \`${change.targets.join(", ")}\``);
-        lines.push(`  - Old: \`${change.oldInterface}\``);
-        lines.push(`  - New: \`${change.newInterface}\``);
+        lines.push(`- ${inlineCode(change.filePath)} line ${change.lineNumber}`);
+        lines.push(`  - Targets: ${inlineCode(change.targets.join(", "))}`);
+        lines.push(`  - Old: ${inlineCode(change.oldInterface)}`);
+        lines.push(`  - New: ${inlineCode(change.newInterface)}`);
     }
     return lines.join("\n");
 }

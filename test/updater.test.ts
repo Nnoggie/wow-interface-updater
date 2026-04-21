@@ -177,4 +177,19 @@ describe("buildPullRequestBody", () => {
     expect(body).toContain("`MyAddon.toc` line 2");
     expect(body).toContain("`## Interface: 120005, 120001`");
   });
+
+  it("summarizes JavaScript interface lines without breaking inline code", () => {
+    const body = buildPullRequestBody([
+      {
+        filePath: "WagoAppCompanion-Mainline.toc.js",
+        lineNumber: 2,
+        targets: ["mainline-test", "mainline"],
+        oldInterface: "export default `## Interface: 120001, 120000",
+        newInterface: "export default `## Interface: 120005, 120001"
+      }
+    ]);
+
+    expect(body).toContain("`` export default `## Interface: 120001, 120000 ``");
+    expect(body).toContain("`` export default `## Interface: 120005, 120001 ``");
+  });
 });
