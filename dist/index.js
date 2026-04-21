@@ -29163,9 +29163,20 @@ function parseTargets(rawTargets, lineNumber) {
     }
     return targets;
 }
-function formatInterfaceLine(values) {
+function parseInterfaceLine(line) {
+    const match = /^(.*?##\s*Interface\s*:\s*)([\d,\s]+)(.*)$/.exec(line);
+    if (!match) {
+        return null;
+    }
+    const [, prefix = "", values = "", suffix = ""] = match;
+    return {
+        values,
+        replace: (nextValues) => `${prefix}${nextValues}${suffix}`
+    };
+}
+function formatInterfaceValues(values) {
     const sorted = [...new Set(values)].sort((left, right) => Number(right) - Number(left));
-    return `## Interface: ${sorted.join(", ")}`;
+    return sorted.join(", ");
 }
 function toReportPath(filePath) {
     const relativePath = external_node_path_default().relative(process.cwd(), filePath);
@@ -29177,23 +29188,24 @@ function toReportPath(filePath) {
 async function updateTocText(text, marker, resolveTarget) {
     const newline = detectNewline(text);
     const { lines, finalNewline } = splitLines(text);
-    const markerRegex = new RegExp(`^#\\s*${escapeRegExp(marker)}\\s*:\\s*(.*)$`);
-    const malformedMarkerRegex = new RegExp(`^#\\s*${escapeRegExp(marker)}\\b`);
-    const interfaceRegex = /^##\s*Interface\s*:\s*(.*)$/;
+    const markerPrefix = "(?:#|//)";
+    const markerRegex = new RegExp(`^${markerPrefix}\\s*${escapeRegExp(marker)}\\s*:\\s*(.*)$`);
+    const malformedMarkerRegex = new RegExp(`^${markerPrefix}\\s*${escapeRegExp(marker)}\\b`);
     const changes = [];
     for (let index = 0; index < lines.length; index += 1) {
         const line = lines[index] ?? "";
         const markerMatch = markerRegex.exec(line);
         if (!markerMatch) {
             if (malformedMarkerRegex.test(line)) {
-                throw new Error(`Line ${index + 1}: marker must use "# ${marker}: target, target" syntax.`);
+                throw new Error(`Line ${index + 1}: marker must use "# ${marker}: target, target" or "// ${marker}: target, target" syntax.`);
             }
             continue;
         }
         const lineNumber = index + 1;
         const interfaceIndex = index + 1;
         const interfaceLine = lines[interfaceIndex];
-        if (interfaceLine === undefined || !interfaceRegex.test(interfaceLine)) {
+        const parsedInterfaceLine = interfaceLine === undefined ? null : parseInterfaceLine(interfaceLine);
+        if (interfaceLine === undefined || !parsedInterfaceLine) {
             throw new Error(`Line ${lineNumber}: marker must be immediately followed by a "## Interface:" line.`);
         }
         const targets = parseTargets(markerMatch[1] ?? "", lineNumber);
@@ -29205,7 +29217,7 @@ async function updateTocText(text, marker, resolveTarget) {
             }
             resolvedValues.push(value);
         }
-        const newInterface = formatInterfaceLine(resolvedValues);
+        const newInterface = parsedInterfaceLine.replace(formatInterfaceValues(resolvedValues));
         if (interfaceLine !== newInterface) {
             lines[interfaceIndex] = newInterface;
             changes.push({

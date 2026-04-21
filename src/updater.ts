@@ -59,9 +59,24 @@ function parseTargets(rawTargets: string, lineNumber: number): string[] {
   return targets;
 }
 
-function formatInterfaceLine(values: string[]): string {
+function parseInterfaceLine(line: string): { values: string; replace: (values: string) => string } | null {
+  const match = /^(.*?##\s*Interface\s*:\s*)([\d,\s]+)(.*)$/.exec(line);
+
+  if (!match) {
+    return null;
+  }
+
+  const [, prefix = "", values = "", suffix = ""] = match;
+
+  return {
+    values,
+    replace: (nextValues: string) => `${prefix}${nextValues}${suffix}`
+  };
+}
+
+function formatInterfaceValues(values: string[]): string {
   const sorted = [...new Set(values)].sort((left, right) => Number(right) - Number(left));
-  return `## Interface: ${sorted.join(", ")}`;
+  return sorted.join(", ");
 }
 
 function toReportPath(filePath: string): string {
@@ -81,9 +96,9 @@ export async function updateTocText(
 ): Promise<TocTextUpdate> {
   const newline = detectNewline(text);
   const { lines, finalNewline } = splitLines(text);
-  const markerRegex = new RegExp(`^#\\s*${escapeRegExp(marker)}\\s*:\\s*(.*)$`);
-  const malformedMarkerRegex = new RegExp(`^#\\s*${escapeRegExp(marker)}\\b`);
-  const interfaceRegex = /^##\s*Interface\s*:\s*(.*)$/;
+  const markerPrefix = "(?:#|//)";
+  const markerRegex = new RegExp(`^${markerPrefix}\\s*${escapeRegExp(marker)}\\s*:\\s*(.*)$`);
+  const malformedMarkerRegex = new RegExp(`^${markerPrefix}\\s*${escapeRegExp(marker)}\\b`);
   const changes: Omit<TocChange, "filePath">[] = [];
 
   for (let index = 0; index < lines.length; index += 1) {
@@ -93,7 +108,7 @@ export async function updateTocText(
     if (!markerMatch) {
       if (malformedMarkerRegex.test(line)) {
         throw new Error(
-          `Line ${index + 1}: marker must use "# ${marker}: target, target" syntax.`
+          `Line ${index + 1}: marker must use "# ${marker}: target, target" or "// ${marker}: target, target" syntax.`
         );
       }
 
@@ -103,8 +118,10 @@ export async function updateTocText(
     const lineNumber = index + 1;
     const interfaceIndex = index + 1;
     const interfaceLine = lines[interfaceIndex];
+    const parsedInterfaceLine =
+      interfaceLine === undefined ? null : parseInterfaceLine(interfaceLine);
 
-    if (interfaceLine === undefined || !interfaceRegex.test(interfaceLine)) {
+    if (interfaceLine === undefined || !parsedInterfaceLine) {
       throw new Error(
         `Line ${lineNumber}: marker must be immediately followed by a "## Interface:" line.`
       );
@@ -123,7 +140,7 @@ export async function updateTocText(
       resolvedValues.push(value);
     }
 
-    const newInterface = formatInterfaceLine(resolvedValues);
+    const newInterface = parsedInterfaceLine.replace(formatInterfaceValues(resolvedValues));
 
     if (interfaceLine !== newInterface) {
       lines[interfaceIndex] = newInterface;

@@ -5,7 +5,8 @@ const values: Record<string, string> = {
   "mainline-beta": "120001",
   "mainline-test": "120005",
   mainline: "120001",
-  mists: "50503"
+  mists: "50503",
+  vanilla: "11508"
 };
 
 async function resolveTarget(target: string): Promise<string> {
@@ -72,6 +73,37 @@ describe("updateTocText", () => {
     );
   });
 
+  it("updates JavaScript TOC template exports with slash markers", async () => {
+    const input = [
+      "// WOW_INTERFACE_TARGETS: mainline-test, mainline",
+      "export default `## Interface: 120001, 120000",
+      "## Title: Wago App Companion",
+      "`;",
+      ""
+    ].join("\n");
+
+    const result = await updateTocText(input, "WOW_INTERFACE_TARGETS", resolveTarget);
+
+    expect(result.text).toBe(
+      [
+        "// WOW_INTERFACE_TARGETS: mainline-test, mainline",
+        "export default `## Interface: 120005, 120001",
+        "## Title: Wago App Companion",
+        "`;",
+        ""
+      ].join("\n")
+    );
+  });
+
+  it("preserves same-line JavaScript template suffixes", async () => {
+    const input = "// WOW_INTERFACE_TARGETS: vanilla\nexport default `## Interface: 1`;\n";
+    const result = await updateTocText(input, "WOW_INTERFACE_TARGETS", resolveTarget);
+
+    expect(result.text).toBe(
+      "// WOW_INTERFACE_TARGETS: vanilla\nexport default `## Interface: 11508`;\n"
+    );
+  });
+
   it("fails when a marker is not followed by an interface line", async () => {
     await expect(
       updateTocText(
@@ -95,7 +127,17 @@ describe("updateTocText", () => {
         "WOW_INTERFACE_TARGETS",
         resolveTarget
       )
-    ).rejects.toThrow('marker must use "# WOW_INTERFACE_TARGETS: target, target" syntax');
+    ).rejects.toThrow('marker must use "# WOW_INTERFACE_TARGETS: target, target"');
+  });
+
+  it("fails when a slash marker is malformed", async () => {
+    await expect(
+      updateTocText(
+        "// WOW_INTERFACE_TARGETS mainline-test\nexport default `## Interface: 1\n",
+        "WOW_INTERFACE_TARGETS",
+        resolveTarget
+      )
+    ).rejects.toThrow('"// WOW_INTERFACE_TARGETS: target, target" syntax');
   });
 
   it("fails when a target resolves to a non-numeric value", async () => {

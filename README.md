@@ -13,6 +13,15 @@ Add a marker comment immediately above each generated interface line:
 
 The action resolves every target, removes duplicate interface numbers, and sorts the final values numerically descending.
 
+For embedded TOC strings in JavaScript files, use a `//` marker outside the string:
+
+```js
+// WOW_INTERFACE_TARGETS: mainline-test, mainline
+export default `## Interface: 120005, 120001
+## Title: Wago App Companion
+`;
+```
+
 ## Workflow
 
 ```yaml
@@ -34,9 +43,9 @@ jobs:
       - uses: actions/checkout@v6
 
       - id: toc
-        uses: <owner>/wow-interface-updater@v1
+        uses: Nnoggie/wow-interface-updater@v1
 
-      - uses: peter-evans/create-pull-request@v7
+      - uses: peter-evans/create-pull-request@v8
         if: steps.toc.outputs.changed == 'true'
         with:
           branch: automation/wow-interface
@@ -50,7 +59,7 @@ jobs:
 
 | Name | Default | Description |
 | --- | --- | --- |
-| `toc-glob` | `**/*.toc` | Glob pattern for TOC files to scan. |
+| `toc-glob` | `**/*.toc` | Glob pattern for TOC files to scan. Use `**/*.toc.js` for embedded JS TOC strings. |
 | `marker` | `WOW_INTERFACE_TARGETS` | Comment marker that declares Warcraft Wiki targets. |
 
 ## Outputs
