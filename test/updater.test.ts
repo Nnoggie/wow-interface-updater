@@ -41,6 +41,34 @@ describe("updateTocText", () => {
     expect(result.changes).toHaveLength(1);
   });
 
+  it("updates TOC files when the marker is directly below the interface line", async () => {
+    const input = [
+      "## Interface: 120001, 120000, 50503",
+      "# WOW_INTERFACE_TARGETS: mainline-beta, mainline-test, mainline, mists",
+      "## Title: Wago UI Pack Installer",
+      ""
+    ].join("\n");
+
+    const result = await updateTocText(input, "WOW_INTERFACE_TARGETS", resolveTarget);
+
+    expect(result.text).toBe(
+      [
+        "## Interface: 120005, 120001, 50503",
+        "# WOW_INTERFACE_TARGETS: mainline-beta, mainline-test, mainline, mists",
+        "## Title: Wago UI Pack Installer",
+        ""
+      ].join("\n")
+    );
+    expect(result.changes).toEqual([
+      {
+        lineNumber: 1,
+        targets: ["mainline-beta", "mainline-test", "mainline", "mists"],
+        oldInterface: "## Interface: 120001, 120000, 50503",
+        newInterface: "## Interface: 120005, 120001, 50503"
+      }
+    ]);
+  });
+
   it("keeps files without markers unchanged", async () => {
     const input = "## Interface: 120001\n## Title: No Marker\n";
     const result = await updateTocText(input, "WOW_INTERFACE_TARGETS", resolveTarget);
@@ -135,7 +163,7 @@ describe("updateTocText", () => {
         "WOW_INTERFACE_TARGETS",
         resolveTarget
       )
-    ).rejects.toThrow('must be immediately followed by a "## Interface:" line');
+    ).rejects.toThrow('must be immediately adjacent to a "## Interface:" line');
   });
 
   it("fails when a marker has no targets", async () => {

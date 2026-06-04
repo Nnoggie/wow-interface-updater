@@ -29175,6 +29175,20 @@ function parseInterfaceLine(line) {
         replace: (nextValues) => `${prefix}${nextValues}${suffix}`
     };
 }
+function findAdjacentInterfaceLine(lines, markerIndex) {
+    const candidates = [markerIndex + 1, markerIndex - 1];
+    for (const candidate of candidates) {
+        const line = lines[candidate];
+        if (line === undefined) {
+            continue;
+        }
+        const parsed = parseInterfaceLine(line);
+        if (parsed) {
+            return { index: candidate, line, parsed };
+        }
+    }
+    return null;
+}
 function formatInterfaceValues(values) {
     const sorted = [...new Set(values)].sort((left, right) => Number(right) - Number(left));
     return sorted.join(", ");
@@ -29206,11 +29220,9 @@ async function updateTocText(text, marker, resolveTarget) {
             continue;
         }
         const lineNumber = index + 1;
-        const interfaceIndex = index + 1;
-        const interfaceLine = lines[interfaceIndex];
-        const parsedInterfaceLine = interfaceLine === undefined ? null : parseInterfaceLine(interfaceLine);
-        if (interfaceLine === undefined || !parsedInterfaceLine) {
-            throw new Error(`Line ${lineNumber}: marker must be immediately followed by a "## Interface:" line.`);
+        const interfaceLine = findAdjacentInterfaceLine(lines, index);
+        if (!interfaceLine) {
+            throw new Error(`Line ${lineNumber}: marker must be immediately adjacent to a "## Interface:" line.`);
         }
         const targets = parseTargets(markerMatch[1] ?? "", lineNumber);
         const resolvedValues = [];
@@ -29221,13 +29233,13 @@ async function updateTocText(text, marker, resolveTarget) {
             }
             resolvedValues.push(value);
         }
-        const newInterface = parsedInterfaceLine.replace(formatInterfaceValues(resolvedValues));
-        if (interfaceLine !== newInterface) {
-            lines[interfaceIndex] = newInterface;
+        const newInterface = interfaceLine.parsed.replace(formatInterfaceValues(resolvedValues));
+        if (interfaceLine.line !== newInterface) {
+            lines[interfaceLine.index] = newInterface;
             changes.push({
-                lineNumber: interfaceIndex + 1,
+                lineNumber: interfaceLine.index + 1,
                 targets,
-                oldInterface: interfaceLine,
+                oldInterface: interfaceLine.line,
                 newInterface
             });
         }

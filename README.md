@@ -4,11 +4,16 @@ Reusable GitHub Action for keeping World of Warcraft add-on TOC `## Interface:` 
 
 ## TOC marker
 
-Add a marker comment immediately above each generated interface line:
+Add a marker comment immediately above or below each generated interface line:
 
 ```toc
 # WOW_INTERFACE_TARGETS: mainline-beta, mainline-test, mainline, mists
 ## Interface: 120005, 120001, 50503
+```
+
+```toc
+## Interface: 120005, 120001, 50503
+# WOW_INTERFACE_TARGETS: mainline-beta, mainline-test, mainline, mists
 ```
 
 The action resolves every target, removes duplicate interface numbers, and sorts the final values numerically descending.
@@ -82,4 +87,4 @@ jobs:
 
 ## Failure behavior
 
-The action fails without writing a partial update when a marker is malformed, a marker is not immediately followed by `## Interface:`, Warcraft Wiki cannot be reached, or a target resolves to a non-numeric value.
+The action fails without writing a partial update when a marker is malformed, a marker is not immediately adjacent to `## Interface:`, Warcraft Wiki cannot be reached, or a target resolves to a non-numeric value.

@@ -74,6 +74,29 @@ function parseInterfaceLine(line: string): { values: string; replace: (values: s
   };
 }
 
+function findAdjacentInterfaceLine(
+  lines: string[],
+  markerIndex: number
+): { index: number; line: string; parsed: NonNullable<ReturnType<typeof parseInterfaceLine>> } | null {
+  const candidates = [markerIndex + 1, markerIndex - 1];
+
+  for (const candidate of candidates) {
+    const line = lines[candidate];
+
+    if (line === undefined) {
+      continue;
+    }
+
+    const parsed = parseInterfaceLine(line);
+
+    if (parsed) {
+      return { index: candidate, line, parsed };
+    }
+  }
+
+  return null;
+}
+
 function formatInterfaceValues(values: string[]): string {
   const sorted = [...new Set(values)].sort((left, right) => Number(right) - Number(left));
   return sorted.join(", ");
@@ -120,14 +143,11 @@ export async function updateTocText(
     }
 
     const lineNumber = index + 1;
-    const interfaceIndex = index + 1;
-    const interfaceLine = lines[interfaceIndex];
-    const parsedInterfaceLine =
-      interfaceLine === undefined ? null : parseInterfaceLine(interfaceLine);
+    const interfaceLine = findAdjacentInterfaceLine(lines, index);
 
-    if (interfaceLine === undefined || !parsedInterfaceLine) {
+    if (!interfaceLine) {
       throw new Error(
-        `Line ${lineNumber}: marker must be immediately followed by a "## Interface:" line.`
+        `Line ${lineNumber}: marker must be immediately adjacent to a "## Interface:" line.`
       );
     }
 
@@ -144,14 +164,14 @@ export async function updateTocText(
       resolvedValues.push(value);
     }
 
-    const newInterface = parsedInterfaceLine.replace(formatInterfaceValues(resolvedValues));
+    const newInterface = interfaceLine.parsed.replace(formatInterfaceValues(resolvedValues));
 
-    if (interfaceLine !== newInterface) {
-      lines[interfaceIndex] = newInterface;
+    if (interfaceLine.line !== newInterface) {
+      lines[interfaceLine.index] = newInterface;
       changes.push({
-        lineNumber: interfaceIndex + 1,
+        lineNumber: interfaceLine.index + 1,
         targets,
-        oldInterface: interfaceLine,
+        oldInterface: interfaceLine.line,
         newInterface
       });
     }
