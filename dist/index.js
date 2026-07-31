@@ -29063,7 +29063,7 @@ __nccwpck_require__.a(module, async (__webpack_handle_async_dependencies__, __we
 
 
 
-const DEFAULT_FILE_GLOB = ["**/*.toc", "**/*.toc.js", "**/*.ps1"].join("\n");
+const DEFAULT_FILE_GLOB = ["**/*.toc", "**/*.toc.js", "**/*.ps1", "**/*.php"].join("\n");
 function createCachedResolver() {
     const cache = new Map();
     return async (target) => {

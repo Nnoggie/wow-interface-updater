@@ -8,7 +8,7 @@ import {
 } from "./updater.js";
 import { resolveLatestInterface } from "./wiki.js";
 
-const DEFAULT_FILE_GLOB = ["**/*.toc", "**/*.toc.js", "**/*.ps1"].join("\n");
+const DEFAULT_FILE_GLOB = ["**/*.toc", "**/*.toc.js", "**/*.ps1", "**/*.php"].join("\n");
 
 function createCachedResolver(): ResolveTarget {
   const cache = new Map<string, Promise<string>>();

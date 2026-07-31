@@ -10,6 +10,7 @@ inputs:
       **/*.toc
       **/*.toc.js
       **/*.ps1
+      **/*.php
   marker:
     description: Comment marker that declares Warcraft Wiki API_LatestInterface targets.
     required: false

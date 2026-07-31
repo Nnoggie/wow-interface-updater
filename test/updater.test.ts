@@ -156,6 +156,28 @@ describe("updateTocText", () => {
     );
   });
 
+  it("updates PHP TOC strings with slash markers", async () => {
+    const input = [
+      "$interfaces = [",
+      "  // WOW_INTERFACE_TARGETS: mainline-test, mainline",
+      "  'mainline' => '## Interface: 120001, 120000',",
+      "];",
+      ""
+    ].join("\n");
+
+    const result = await updateTocText(input, "WOW_INTERFACE_TARGETS", resolveTarget);
+
+    expect(result.text).toBe(
+      [
+        "$interfaces = [",
+        "  // WOW_INTERFACE_TARGETS: mainline-test, mainline",
+        "  'mainline' => '## Interface: 120005, 120001',",
+        "];",
+        ""
+      ].join("\n")
+    );
+  });
+
   it("fails when a marker is not followed by an interface line", async () => {
     await expect(
       updateTocText(

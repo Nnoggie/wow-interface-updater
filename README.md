@@ -37,6 +37,15 @@ $tocContent = @(
 )
 ```
 
+For embedded TOC strings in PHP files, use a `//` or `#` marker immediately above the interface string:
+
+```php
+$interfaces = [
+    // WOW_INTERFACE_TARGETS: mainline-test, mainline
+    'mainline' => '## Interface: 120005, 120001',
+];
+```
+
 ## Workflow
 
 ```yaml
@@ -74,7 +83,7 @@ jobs:
 
 | Name | Default | Description |
 | --- | --- | --- |
-| `toc-glob` | `**/*.toc`, `**/*.toc.js`, `**/*.ps1` | Glob pattern for files to scan. |
+| `toc-glob` | `**/*.toc`, `**/*.toc.js`, `**/*.ps1`, `**/*.php` | Glob pattern for files to scan. |
 | `marker` | `WOW_INTERFACE_TARGETS` | Comment marker that declares Warcraft Wiki targets. |
 
 ## Outputs
