@@ -7,22 +7,24 @@ Reusable GitHub Action for keeping World of Warcraft add-on TOC `## Interface:` 
 Add a marker comment immediately above or below each generated interface line:
 
 ```toc
-# WOW_INTERFACE_TARGETS: mainline-beta, mainline-test, mainline, mists
-## Interface: 120005, 120001, 50503
+# WOW_INTERFACE_TARGETS: standard-beta, standard-test, standard, mists
+## Interface: 120105, 120100, 120001, 50504
 ```
 
 ```toc
-## Interface: 120005, 120001, 50503
-# WOW_INTERFACE_TARGETS: mainline-beta, mainline-test, mainline, mists
+## Interface: 120105, 120100, 120001, 50504
+# WOW_INTERFACE_TARGETS: standard-beta, standard-test, standard, mists
 ```
 
 The action resolves every target, removes duplicate interface numbers, and sorts the final values numerically descending.
 
+Use the target names documented by Warcraft Wiki. Removed `mainline*` and `classic*` names remain supported as compatibility aliases. WoW Forever beta is available as `camelot-beta` or `forever-beta`; its live and test targets should only be added after Warcraft Wiki publishes values for them.
+
 For embedded TOC strings in JavaScript files, use a `//` marker outside the string:
 
 ```js
-// WOW_INTERFACE_TARGETS: mainline-test, mainline
-export default `## Interface: 120005, 120001
+// WOW_INTERFACE_TARGETS: standard-test, standard
+export default `## Interface: 120105, 120100
 ## Title: Wago App Companion
 `;
 ```
@@ -31,8 +33,8 @@ For embedded TOC strings in PowerShell files, use a `#` marker immediately above
 
 ```powershell
 $tocContent = @(
-  # WOW_INTERFACE_TARGETS: mainline-test, mainline, mists, vanilla
-  "## Interface: 120005, 120001, 50503, 11508"
+  # WOW_INTERFACE_TARGETS: standard-test, standard, mists, vanilla
+  "## Interface: 120105, 120100, 50504, 11509"
   "## Title: SharedMedia_Template"
 )
 ```
@@ -41,8 +43,8 @@ For embedded TOC strings in PHP files, use a `//` or `#` marker immediately abov
 
 ```php
 $interfaces = [
-    // WOW_INTERFACE_TARGETS: mainline-test, mainline
-    'mainline' => '## Interface: 120005, 120001',
+    // WOW_INTERFACE_TARGETS: standard-test, standard
+    'mainline' => '## Interface: 120105, 120100',
 ];
 ```
 
