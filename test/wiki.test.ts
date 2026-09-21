@@ -6,16 +6,26 @@ describe("resolveLatestInterface", () => {
     vi.restoreAllMocks();
   });
 
-  it("returns numeric template expansion output", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () => ({
-        ok: true,
-        json: async () => ({ expandtemplates: { wikitext: "120005" } })
-      }))
-    );
+  it.each([
+    ["mainline", "standard"],
+    ["mainline-test", "standard-test"],
+    ["mainline-beta", "standard-beta"],
+    ["classic", "mists"],
+    ["classic-china", "mists"],
+    ["classic-test", "mists-test"],
+    ["classic-beta", "mists-beta"]
+  ])("resolves the removed %s alias through %s", async (target, wikiTarget) => {
+    const fetchMock = vi.fn(async (_url: URL) => ({
+      ok: true,
+      json: async () => ({ expandtemplates: { wikitext: "120005" } })
+    }));
+    vi.stubGlobal("fetch", fetchMock);
 
-    await expect(resolveLatestInterface("mainline-test")).resolves.toBe("120005");
+    await expect(resolveLatestInterface(target)).resolves.toBe("120005");
+
+    const url = fetchMock.mock.calls[0]?.[0];
+    expect(url).toBeInstanceOf(URL);
+    expect((url as URL).searchParams.get("text")).toBe(`{{API LatestInterface|${wikiTarget}}}`);
   });
 
   it("fails on non-numeric expansion output", async () => {

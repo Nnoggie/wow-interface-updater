@@ -29306,12 +29306,22 @@ function buildPullRequestBody(changes) {
 /* harmony export */ });
 const WIKI_API_URL = "https://warcraft.wiki.gg/api.php";
 const USER_AGENT = "wow-interface-updater/0.1";
+const TARGET_ALIASES = {
+    mainline: "standard",
+    "mainline-test": "standard-test",
+    "mainline-beta": "standard-beta",
+    classic: "mists",
+    "classic-china": "mists",
+    "classic-test": "mists-test",
+    "classic-beta": "mists-beta"
+};
 async function resolveLatestInterface(target) {
+    const wikiTarget = TARGET_ALIASES[target] ?? target;
     const url = new URL(WIKI_API_URL);
     url.searchParams.set("action", "expandtemplates");
     url.searchParams.set("format", "json");
     url.searchParams.set("prop", "wikitext");
-    url.searchParams.set("text", `{{API LatestInterface|${target}}}`);
+    url.searchParams.set("text", `{{API LatestInterface|${wikiTarget}}}`);
     const response = await fetch(url, {
         headers: {
             "User-Agent": USER_AGENT
