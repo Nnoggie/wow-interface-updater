@@ -29066,11 +29066,17 @@ __nccwpck_require__.a(module, async (__webpack_handle_async_dependencies__, __we
 const DEFAULT_FILE_GLOB = ["**/*.toc", "**/*.toc.js", "**/*.ps1", "**/*.php"].join("\n");
 function createCachedResolver() {
     const cache = new Map();
-    return async (target) => {
-        if (!cache.has(target)) {
-            cache.set(target, (0,_wiki_js__WEBPACK_IMPORTED_MODULE_3__/* .resolveLatestInterface */ .l)(target));
-        }
-        return cache.get(target);
+    const resolved = new Set();
+    return {
+        resolveTarget: async (target) => {
+            if (!cache.has(target)) {
+                cache.set(target, (0,_wiki_js__WEBPACK_IMPORTED_MODULE_3__/* .resolveLatestInterface */ .lf)(target));
+            }
+            const value = await cache.get(target);
+            resolved.add(target);
+            return value;
+        },
+        resolvedCount: () => resolved.size
     };
 }
 async function run() {
@@ -29080,7 +29086,7 @@ async function run() {
         followSymbolicLinks: false
     });
     const files = await globber.glob();
-    const resolveTarget = createCachedResolver();
+    const { resolveTarget, resolvedCount } = createCachedResolver();
     const plans = [];
     for (const file of files) {
         const plan = await (0,_updater_js__WEBPACK_IMPORTED_MODULE_2__/* .planTocFileUpdate */ .lf)(file, marker, resolveTarget);
@@ -29088,16 +29094,26 @@ async function run() {
             plans.push(plan);
         }
     }
+    const changes = plans.flatMap((plan) => plan.changes);
+    const warnings = plans.flatMap((plan) => plan.warnings);
+    for (const warning of warnings) {
+        _actions_core__WEBPACK_IMPORTED_MODULE_0__/* .warning */ .$e(warning.message, { file: warning.filePath, startLine: warning.lineNumber });
+    }
+    if (warnings.length > 0 && resolvedCount() === 0) {
+        // Nothing resolved at all usually means the wiki template changed, not that every marker is wrong.
+        throw new Error(`No WoW interface targets could be resolved. ${warnings
+            .map((warning) => `${warning.filePath}:${warning.lineNumber}: ${warning.message}`)
+            .join(" ")}`);
+    }
     for (const plan of plans) {
         await (0,_updater_js__WEBPACK_IMPORTED_MODULE_2__/* .writeTocFileUpdate */ .Fy)(plan);
     }
-    const changes = plans.flatMap((plan) => plan.changes);
     const updatedFiles = [...new Set(changes.map((change) => change.filePath))];
     const changed = changes.length > 0;
     _actions_core__WEBPACK_IMPORTED_MODULE_0__/* .setOutput */ .uH("changed", changed ? "true" : "false");
     _actions_core__WEBPACK_IMPORTED_MODULE_0__/* .setOutput */ .uH("updated-files", updatedFiles.join(","));
     _actions_core__WEBPACK_IMPORTED_MODULE_0__/* .setOutput */ .uH("pr-body", changed
-        ? (0,_updater_js__WEBPACK_IMPORTED_MODULE_2__/* .buildPullRequestBody */ .B_)(changes)
+        ? (0,_updater_js__WEBPACK_IMPORTED_MODULE_2__/* .buildPullRequestBody */ .B_)(changes, warnings)
         : "All WoW TOC interface versions are already up to date.");
     if (changed) {
         _actions_core__WEBPACK_IMPORTED_MODULE_0__/* .info */ .pq(`Updated ${changes.length} interface line(s) in ${updatedFiles.length} file(s).`);
@@ -29133,7 +29149,10 @@ const promises_namespaceObject = __WEBPACK_EXTERNAL_createRequire(import.meta.ur
 ;// CONCATENATED MODULE: external "node:path"
 const external_node_path_namespaceObject = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("node:path");
 var external_node_path_default = /*#__PURE__*/__nccwpck_require__.n(external_node_path_namespaceObject);
+// EXTERNAL MODULE: ./src/wiki.ts
+var wiki = __nccwpck_require__(8367);
 ;// CONCATENATED MODULE: ./src/updater.ts
+
 
 
 function escapeRegExp(value) {
@@ -29210,6 +29229,7 @@ async function updateTocText(text, marker, resolveTarget) {
     const markerRegex = new RegExp(`^${markerPrefix}\\s*${escapeRegExp(marker)}\\s*:\\s*(.*)$`);
     const malformedMarkerRegex = new RegExp(`^${markerPrefix}\\s*${escapeRegExp(marker)}\\b`);
     const changes = [];
+    const warnings = [];
     for (let index = 0; index < lines.length; index += 1) {
         const line = lines[index] ?? "";
         const markerMatch = markerRegex.exec(line);
@@ -29226,12 +29246,31 @@ async function updateTocText(text, marker, resolveTarget) {
         }
         const targets = parseTargets(markerMatch[1] ?? "", lineNumber);
         const resolvedValues = [];
+        const unknownTargets = [];
         for (const target of targets) {
-            const value = await resolveTarget(target);
+            let value;
+            try {
+                value = await resolveTarget(target);
+            }
+            catch (error) {
+                if (error instanceof wiki/* UnknownTargetError */.eh) {
+                    unknownTargets.push(error);
+                    continue;
+                }
+                throw error;
+            }
             if (!/^\d+$/.test(value)) {
                 throw new Error(`Target "${target}" resolved to a non-numeric interface: "${value}"`);
             }
             resolvedValues.push(value);
+        }
+        if (unknownTargets.length > 0) {
+            // Dropping the unknown targets would also drop their interface numbers, so leave the line as-is.
+            warnings.push({
+                lineNumber,
+                message: `Skipped interface update. ${unknownTargets.map((error) => error.message).join(" ")}`
+            });
+            continue;
         }
         const newInterface = interfaceLine.parsed.replace(formatInterfaceValues(resolvedValues));
         if (interfaceLine.line !== newInterface) {
@@ -29246,7 +29285,8 @@ async function updateTocText(text, marker, resolveTarget) {
     }
     return {
         text: changes.length > 0 ? joinLines(lines, newline, finalNewline) : text,
-        changes
+        changes,
+        warnings
     };
 }
 async function updateTocFile(filePath, marker, resolveTarget) {
@@ -29262,22 +29302,30 @@ async function planTocFileUpdate(filePath, marker, resolveTarget) {
     const hasBom = original.startsWith("\uFEFF");
     const text = hasBom ? original.slice(1) : original;
     const updated = await updateTocText(text, marker, resolveTarget);
-    if (updated.changes.length === 0) {
+    if (updated.changes.length === 0 && updated.warnings.length === 0) {
         return null;
     }
+    const reportPath = toReportPath(filePath);
     return {
         filePath,
         text: hasBom ? `\uFEFF${updated.text}` : updated.text,
         changes: updated.changes.map((change) => ({
-            filePath: toReportPath(filePath),
+            filePath: reportPath,
             ...change
+        })),
+        warnings: updated.warnings.map((warning) => ({
+            filePath: reportPath,
+            ...warning
         }))
     };
 }
 async function writeTocFileUpdate(plan) {
+    if (plan.changes.length === 0) {
+        return;
+    }
     await (0,promises_namespaceObject.writeFile)(plan.filePath, plan.text, "utf8");
 }
-function buildPullRequestBody(changes) {
+function buildPullRequestBody(changes, warnings = []) {
     const lines = [
         "Updates WoW TOC interface versions from Warcraft Wiki.",
         "",
@@ -29292,6 +29340,12 @@ function buildPullRequestBody(changes) {
         lines.push(`  - Old: ${inlineCode(change.oldInterface)}`);
         lines.push(`  - New: ${inlineCode(change.newInterface)}`);
     }
+    if (warnings.length > 0) {
+        lines.push("", "Skipped lines:", "");
+        for (const warning of warnings) {
+            lines.push(`- ${inlineCode(warning.filePath)} line ${warning.lineNumber}: ${warning.message}`);
+        }
+    }
     return lines.join("\n");
 }
 
@@ -29302,9 +29356,12 @@ function buildPullRequestBody(changes) {
 /***/ ((__unused_webpack_module, __webpack_exports__, __nccwpck_require__) => {
 
 /* harmony export */ __nccwpck_require__.d(__webpack_exports__, {
-/* harmony export */   l: () => (/* binding */ resolveLatestInterface)
+/* harmony export */   eh: () => (/* binding */ UnknownTargetError),
+/* harmony export */   lf: () => (/* binding */ resolveLatestInterface)
 /* harmony export */ });
+/* unused harmony exports parseKnownTargets, resetKnownTargetsCache, describeUnknownTarget */
 const WIKI_API_URL = "https://warcraft.wiki.gg/api.php";
+const PATCH_INFO_TEMPLATE = "Template:LatestPatchInfo";
 const USER_AGENT = "wow-interface-updater/0.1";
 const TARGET_ALIASES = {
     mainline: "standard",
@@ -29315,6 +29372,66 @@ const TARGET_ALIASES = {
     "classic-test": "mists-test",
     "classic-beta": "mists-beta"
 };
+let knownTargetsPromise;
+class UnknownTargetError extends Error {
+    target;
+    constructor(target, message) {
+        super(message);
+        this.name = "UnknownTargetError";
+        this.target = target;
+    }
+}
+function parseKnownTargets(templateSource) {
+    const targets = new Set();
+    // Each patch row in the template's #switch looks like "|key|key=...\!\!Expansion\!\!...".
+    for (const match of templateSource.matchAll(/^\s*\|([\w|-]+)=.*\\!\\!/gm)) {
+        for (const target of (match[1] ?? "").split("|")) {
+            // Client folder keys like _retail_ are wiki-internal and not useful to suggest.
+            if (target && !/^_.*_$/.test(target)) {
+                targets.add(target);
+            }
+        }
+    }
+    return [...targets];
+}
+async function fetchKnownTargets() {
+    const url = new URL(WIKI_API_URL);
+    url.searchParams.set("action", "query");
+    url.searchParams.set("format", "json");
+    url.searchParams.set("formatversion", "2");
+    url.searchParams.set("prop", "revisions");
+    url.searchParams.set("rvprop", "content");
+    url.searchParams.set("rvslots", "main");
+    url.searchParams.set("titles", PATCH_INFO_TEMPLATE);
+    const response = await fetch(url, {
+        headers: {
+            "User-Agent": USER_AGENT
+        }
+    });
+    if (!response.ok) {
+        return [];
+    }
+    const payload = (await response.json());
+    return parseKnownTargets(String(payload.query?.pages?.[0]?.revisions?.[0]?.slots?.main?.content ?? ""));
+}
+function getKnownTargets() {
+    knownTargetsPromise ??= fetchKnownTargets().catch(() => []);
+    return knownTargetsPromise;
+}
+function resetKnownTargetsCache() {
+    knownTargetsPromise = undefined;
+}
+function describeUnknownTarget(target, value, knownTargets) {
+    const parts = [`Warcraft Wiki has no interface for target "${target}" (got "${value}").`];
+    const suggestions = knownTargets.filter((known) => known.startsWith(`${target}-`) || target.startsWith(`${known}-`));
+    if (suggestions.length > 0) {
+        parts.push(`Did you mean ${suggestions.map((suggestion) => `"${suggestion}"`).join(" or ")}?`);
+    }
+    if (knownTargets.length > 0) {
+        parts.push(`Known targets: ${knownTargets.join(", ")}.`);
+    }
+    return parts.join(" ");
+}
 async function resolveLatestInterface(target) {
     const wikiTarget = TARGET_ALIASES[target] ?? target;
     const url = new URL(WIKI_API_URL);
@@ -29333,7 +29450,7 @@ async function resolveLatestInterface(target) {
     const payload = (await response.json());
     const value = String(payload.expandtemplates?.wikitext ?? "").trim();
     if (!/^\d+$/.test(value)) {
-        throw new Error(`Warcraft Wiki returned a non-numeric interface for "${target}": "${value}"`);
+        throw new UnknownTargetError(target, describeUnknownTarget(target, value, await getKnownTargets()));
     }
     return value;
 }
@@ -29575,10 +29692,11 @@ __nccwpck_require__.d(__webpack_exports__, {
   V4: () => (/* binding */ getInput),
   pq: () => (/* binding */ info),
   C1: () => (/* binding */ setFailed),
-  uH: () => (/* binding */ setOutput)
+  uH: () => (/* binding */ setOutput),
+  $e: () => (/* binding */ warning)
 });
 
-// UNUSED EXPORTS: ExitCode, addPath, endGroup, error, exportVariable, getBooleanInput, getIDToken, getMultilineInput, getState, group, isDebug, markdownSummary, notice, platform, saveState, setCommandEcho, setSecret, startGroup, summary, toPlatformPath, toPosixPath, toWin32Path, warning
+// UNUSED EXPORTS: ExitCode, addPath, endGroup, error, exportVariable, getBooleanInput, getIDToken, getMultilineInput, getState, group, isDebug, markdownSummary, notice, platform, saveState, setCommandEcho, setSecret, startGroup, summary, toPlatformPath, toPosixPath, toWin32Path
 
 // EXTERNAL MODULE: external "os"
 var external_os_ = __nccwpck_require__(857);
@@ -32423,7 +32541,7 @@ function error(message, properties = {}) {
  * @param properties optional properties to add to the annotation.
  */
 function warning(message, properties = {}) {
-    issueCommand('warning', toCommandProperties(properties), message instanceof Error ? message.toString() : message);
+    command_issueCommand('warning', utils_toCommandProperties(properties), message instanceof Error ? message.toString() : message);
 }
 /**
  * Adds a notice issue

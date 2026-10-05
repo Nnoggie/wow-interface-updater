@@ -98,4 +98,6 @@ jobs:
 
 ## Failure behavior
 
-The action fails without writing a partial update when a marker is malformed, a marker is not immediately adjacent to `## Interface:`, Warcraft Wiki cannot be reached, or a target resolves to a non-numeric value.
+The action fails without writing a partial update when a marker is malformed, a marker is not immediately adjacent to `## Interface:`, or Warcraft Wiki cannot be reached.
+
+When Warcraft Wiki has no interface for a target, the interface line for that marker is left unchanged and a warning annotation lists the known targets. Other markers are still updated, and skipped lines are listed in `pr-body`. If no target resolves at all, the action fails.
