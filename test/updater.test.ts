@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildPullRequestBody, updateTocText } from "../src/updater.js";
+import { UnknownTargetError } from "../src/wiki.js";
 
 const values: Record<string, string> = {
   "mainline-beta": "120001",
@@ -233,6 +234,41 @@ describe("updateTocText", () => {
       )
     ).rejects.toThrow("Unknown target: unknown");
   });
+
+  it("skips lines with unknown wiki targets and keeps updating other lines", async () => {
+    const input = [
+      "# WOW_INTERFACE_TARGETS: forever, mists",
+      "## Interface: 16001, 50503",
+      "# WOW_INTERFACE_TARGETS: mainline-test",
+      "## Interface: 120001",
+      ""
+    ].join("\n");
+
+    const result = await updateTocText(input, "WOW_INTERFACE_TARGETS", async (target) => {
+      if (target === "forever") {
+        throw new UnknownTargetError(target, 'Warcraft Wiki has no interface for target "forever".');
+      }
+
+      return resolveTarget(target);
+    });
+
+    expect(result.text).toBe(
+      [
+        "# WOW_INTERFACE_TARGETS: forever, mists",
+        "## Interface: 16001, 50503",
+        "# WOW_INTERFACE_TARGETS: mainline-test",
+        "## Interface: 120005",
+        ""
+      ].join("\n")
+    );
+    expect(result.changes).toHaveLength(1);
+    expect(result.warnings).toEqual([
+      {
+        lineNumber: 1,
+        message: 'Skipped interface update. Warcraft Wiki has no interface for target "forever".'
+      }
+    ]);
+  });
 });
 
 describe("buildPullRequestBody", () => {
@@ -265,5 +301,23 @@ describe("buildPullRequestBody", () => {
 
     expect(body).toContain("`` export default `## Interface: 120001, 120000 ``");
     expect(body).toContain("`` export default `## Interface: 120005, 120001 ``");
+  });
+
+  it("lists skipped lines", () => {
+    const body = buildPullRequestBody(
+      [
+        {
+          filePath: "MyAddon.toc",
+          lineNumber: 2,
+          targets: ["mainline"],
+          oldInterface: "## Interface: 120001",
+          newInterface: "## Interface: 120005"
+        }
+      ],
+      [{ filePath: "MyAddon_Forever.toc", lineNumber: 1, message: "Skipped interface update." }]
+    );
+
+    expect(body).toContain("Skipped lines:");
+    expect(body).toContain("- `MyAddon_Forever.toc` line 1: Skipped interface update.");
   });
 });

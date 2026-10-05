@@ -10,15 +10,21 @@ import { resolveLatestInterface } from "./wiki.js";
 
 const DEFAULT_FILE_GLOB = ["**/*.toc", "**/*.toc.js", "**/*.ps1", "**/*.php"].join("\n");
 
-function createCachedResolver(): ResolveTarget {
+function createCachedResolver(): { resolveTarget: ResolveTarget; resolvedCount: () => number } {
   const cache = new Map<string, Promise<string>>();
+  const resolved = new Set<string>();
 
-  return async (target: string) => {
-    if (!cache.has(target)) {
-      cache.set(target, resolveLatestInterface(target));
-    }
+  return {
+    resolveTarget: async (target: string) => {
+      if (!cache.has(target)) {
+        cache.set(target, resolveLatestInterface(target));
+      }
 
-    return cache.get(target)!;
+      const value = await cache.get(target)!;
+      resolved.add(target);
+      return value;
+    },
+    resolvedCount: () => resolved.size
   };
 }
 
@@ -29,7 +35,7 @@ async function run(): Promise<void> {
     followSymbolicLinks: false
   });
   const files = await globber.glob();
-  const resolveTarget = createCachedResolver();
+  const { resolveTarget, resolvedCount } = createCachedResolver();
   const plans = [];
 
   for (const file of files) {
@@ -40,11 +46,26 @@ async function run(): Promise<void> {
     }
   }
 
+  const changes = plans.flatMap((plan) => plan.changes);
+  const warnings = plans.flatMap((plan) => plan.warnings);
+
+  for (const warning of warnings) {
+    core.warning(warning.message, { file: warning.filePath, startLine: warning.lineNumber });
+  }
+
+  if (warnings.length > 0 && resolvedCount() === 0) {
+    // Nothing resolved at all usually means the wiki template changed, not that every marker is wrong.
+    throw new Error(
+      `No WoW interface targets could be resolved. ${warnings
+        .map((warning) => `${warning.filePath}:${warning.lineNumber}: ${warning.message}`)
+        .join(" ")}`
+    );
+  }
+
   for (const plan of plans) {
     await writeTocFileUpdate(plan);
   }
 
-  const changes = plans.flatMap((plan) => plan.changes);
   const updatedFiles = [...new Set(changes.map((change) => change.filePath))];
   const changed = changes.length > 0;
 
@@ -53,7 +74,7 @@ async function run(): Promise<void> {
   core.setOutput(
     "pr-body",
     changed
-      ? buildPullRequestBody(changes)
+      ? buildPullRequestBody(changes, warnings)
       : "All WoW TOC interface versions are already up to date."
   );
 

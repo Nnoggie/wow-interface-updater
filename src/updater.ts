@@ -1,5 +1,6 @@
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { UnknownTargetError } from "./wiki.js";
 
 export type ResolveTarget = (target: string) => Promise<string>;
 
@@ -11,15 +12,23 @@ export interface TocChange {
   newInterface: string;
 }
 
+export interface TocWarning {
+  filePath: string;
+  lineNumber: number;
+  message: string;
+}
+
 export interface TocTextUpdate {
   text: string;
   changes: Omit<TocChange, "filePath">[];
+  warnings: Omit<TocWarning, "filePath">[];
 }
 
 export interface TocFileUpdatePlan {
   filePath: string;
   text: string;
   changes: TocChange[];
+  warnings: TocWarning[];
 }
 
 function escapeRegExp(value: string): string {
@@ -127,6 +136,7 @@ export async function updateTocText(
   const markerRegex = new RegExp(`^${markerPrefix}\\s*${escapeRegExp(marker)}\\s*:\\s*(.*)$`);
   const malformedMarkerRegex = new RegExp(`^${markerPrefix}\\s*${escapeRegExp(marker)}\\b`);
   const changes: Omit<TocChange, "filePath">[] = [];
+  const warnings: Omit<TocWarning, "filePath">[] = [];
 
   for (let index = 0; index < lines.length; index += 1) {
     const line = lines[index] ?? "";
@@ -153,15 +163,36 @@ export async function updateTocText(
 
     const targets = parseTargets(markerMatch[1] ?? "", lineNumber);
     const resolvedValues = [];
+    const unknownTargets: UnknownTargetError[] = [];
 
     for (const target of targets) {
-      const value = await resolveTarget(target);
+      let value: string;
+
+      try {
+        value = await resolveTarget(target);
+      } catch (error) {
+        if (error instanceof UnknownTargetError) {
+          unknownTargets.push(error);
+          continue;
+        }
+
+        throw error;
+      }
 
       if (!/^\d+$/.test(value)) {
         throw new Error(`Target "${target}" resolved to a non-numeric interface: "${value}"`);
       }
 
       resolvedValues.push(value);
+    }
+
+    if (unknownTargets.length > 0) {
+      // Dropping the unknown targets would also drop their interface numbers, so leave the line as-is.
+      warnings.push({
+        lineNumber,
+        message: `Skipped interface update. ${unknownTargets.map((error) => error.message).join(" ")}`
+      });
+      continue;
     }
 
     const newInterface = interfaceLine.parsed.replace(formatInterfaceValues(resolvedValues));
@@ -179,7 +210,8 @@ export async function updateTocText(
 
   return {
     text: changes.length > 0 ? joinLines(lines, newline, finalNewline) : text,
-    changes
+    changes,
+    warnings
   };
 }
 
@@ -209,25 +241,35 @@ export async function planTocFileUpdate(
   const text = hasBom ? original.slice(1) : original;
   const updated = await updateTocText(text, marker, resolveTarget);
 
-  if (updated.changes.length === 0) {
+  if (updated.changes.length === 0 && updated.warnings.length === 0) {
     return null;
   }
+
+  const reportPath = toReportPath(filePath);
 
   return {
     filePath,
     text: hasBom ? `\uFEFF${updated.text}` : updated.text,
     changes: updated.changes.map((change) => ({
-      filePath: toReportPath(filePath),
+      filePath: reportPath,
       ...change
+    })),
+    warnings: updated.warnings.map((warning) => ({
+      filePath: reportPath,
+      ...warning
     }))
   };
 }
 
 export async function writeTocFileUpdate(plan: TocFileUpdatePlan): Promise<void> {
+  if (plan.changes.length === 0) {
+    return;
+  }
+
   await writeFile(plan.filePath, plan.text, "utf8");
 }
 
-export function buildPullRequestBody(changes: TocChange[]): string {
+export function buildPullRequestBody(changes: TocChange[], warnings: TocWarning[] = []): string {
   const lines = [
     "Updates WoW TOC interface versions from Warcraft Wiki.",
     "",
@@ -242,6 +284,14 @@ export function buildPullRequestBody(changes: TocChange[]): string {
     lines.push(`  - Targets: ${inlineCode(change.targets.join(", "))}`);
     lines.push(`  - Old: ${inlineCode(change.oldInterface)}`);
     lines.push(`  - New: ${inlineCode(change.newInterface)}`);
+  }
+
+  if (warnings.length > 0) {
+    lines.push("", "Skipped lines:", "");
+
+    for (const warning of warnings) {
+      lines.push(`- ${inlineCode(warning.filePath)} line ${warning.lineNumber}: ${warning.message}`);
+    }
   }
 
   return lines.join("\n");
